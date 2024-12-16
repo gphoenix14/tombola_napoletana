@@ -200,8 +200,7 @@ for g in range(n_giocatori):
     etichette_cartelle.append(lbls)
 
 def lampeggia(label, colore1, colore2, count):
-    # count indica quante volte alternare il colore per un totale di circa 1 secondo
-    # ad esempio 2 volte: 500 ms un colore, 500 ms l'altro, totale 1 secondo
+    # Lampeggia count volte alternando il colore
     if count > 0:
         attuale = label.cget("bg")
         nuovo = colore2 if attuale == colore1 else colore1
@@ -219,8 +218,6 @@ def aggiorna_cartelle():
                 num = cart[r][c]
                 lbl = etichette_cartelle[g][r][c]
                 if num in numeri_estratti:
-                    # Lascio solo il colore finale in giallo, il lampeggio lo faccio dopo
-                    # l'aggiornamento
                     lbl.config(bg="yellow")
                 else:
                     lbl.config(bg="white")
@@ -262,13 +259,13 @@ def aggiorna_probabilita():
     for g in range(n_giocatori):
         cart = giocatori_cartelle[g]
         tutti_numeri = [n for riga in cart for n in riga]
-        estratti_nella_cartella = [n for n in tutti_numeri if n in numeri_estratti]
         numeri_non_estratti = set(tutti_numeri) - set(numeri_estratti)
         numeri_rimanenti = set(range(1,91)) - set(numeri_estratti)
         utili = len(numeri_non_estratti.intersection(numeri_rimanenti))
-        prob = 0.0
         if rimanenti > 0:
             prob = utili / rimanenti
+        else:
+            prob = 0.0
         etichette_probabilita[g].config(text=f"Probabilità di estrarre un numero utile: {prob*100:.2f}%")
 
 def fine_gioco_se_necessario():
@@ -299,15 +296,15 @@ def estrai_numero():
 
     aggiorna_cartelle()
 
-    # Avvia lampeggio dei numeri appena estratti nelle cartelle
+    # Avvia lampeggio dei numeri appena estratti nelle cartelle per 3 volte
     for g in range(n_giocatori):
         cart = giocatori_cartelle[g]
         for r in range(3):
             for c in range(5):
                 if cart[r][c] == numero:
                     # Il label attuale è giallo, facciamolo lampeggiare
-                    # Alterniamo tra giallo e bianco per 2 volte (tot 1 secondo)
-                    lampeggia(etichette_cartelle[g][r][c], "yellow", "white", 2)
+                    # Alterniamo tra giallo e bianco 3 volte (1,5 secondi totali)
+                    lampeggia(etichette_cartelle[g][r][c], "yellow", "white", 3)
 
     aggiorna_vincite()
 
@@ -315,7 +312,6 @@ def estrai_numero():
     if primi_vincitori["tombola"] is not None:
         winner_index = primi_vincitori["tombola"]
         print(f"{nomi_giocatori[winner_index]} ha vinto!")
-        # Gioco finito
         return
 
     aggiorna_probabilita()
