@@ -143,6 +143,9 @@ def controlla_cartella(cartella, estratti):
 
 giocatori_vincite = [ {"ambo":False,"terno":False,"quaterna":False,"cinquina":False,"tombola":False} for _ in range(n_giocatori) ]
 
+# Manteniamo il primo vincitore per ogni tipo di combinazione
+primi_vincitori = {"ambo": None, "terno": None, "quaterna": None, "cinquina": None, "tombola": None}
+
 root = tk.Tk()
 root.title("Tombola - Finestra Principale")
 root.geometry("1000x800")
@@ -196,6 +199,18 @@ for g in range(n_giocatori):
     finestre_giocatori.append(fg)
     etichette_cartelle.append(lbls)
 
+def lampeggia(label, colore1, colore2, count):
+    # count indica quante volte alternare il colore per un totale di circa 1 secondo
+    # ad esempio 2 volte: 500 ms un colore, 500 ms l'altro, totale 1 secondo
+    if count > 0:
+        attuale = label.cget("bg")
+        nuovo = colore2 if attuale == colore1 else colore1
+        label.config(bg=nuovo)
+        label.after(500, lampeggia, label, colore1, colore2, count-1)
+    else:
+        # Finito il lampeggio, imposta definitivamente in giallo
+        label.config(bg="yellow")
+
 def aggiorna_cartelle():
     for g in range(n_giocatori):
         cart = giocatori_cartelle[g]
@@ -204,6 +219,8 @@ def aggiorna_cartelle():
                 num = cart[r][c]
                 lbl = etichette_cartelle[g][r][c]
                 if num in numeri_estratti:
+                    # Lascio solo il colore finale in giallo, il lampeggio lo faccio dopo
+                    # l'aggiornamento
                     lbl.config(bg="yellow")
                 else:
                     lbl.config(bg="white")
@@ -211,21 +228,31 @@ def aggiorna_cartelle():
 def aggiorna_vincite():
     testo_vincite.config(state="normal")
     testo_vincite.delete("1.0", tk.END)
+    # Controllo nuove vincite
     for g in range(n_giocatori):
         res = controlla_cartella(giocatori_cartelle[g], numeri_estratti)
         for chiave in res:
             if res[chiave] and not giocatori_vincite[g][chiave]:
                 giocatori_vincite[g][chiave] = True
+                # Se non abbiamo ancora un vincitore per questa combinazione, assegniamo il primo
+                if primi_vincitori[chiave] is None:
+                    primi_vincitori[chiave] = g
+
+    # Stampa solo il primo vincitore per ogni combinazione
     for chiave in ["ambo","terno","quaterna","cinquina","tombola"]:
-        vincitori = [f"{nomi_giocatori[i]}" for i,v in enumerate(giocatori_vincite) if v[chiave]]
-        if vincitori:
-            testo_vincite.insert(tk.END, f"{chiave.capitalize()}: {', '.join(vincitori)}\n")
+        if primi_vincitori[chiave] is not None:
+            winner_index = primi_vincitori[chiave]
+            testo_vincite.insert(tk.END, f"{chiave.capitalize()}: {nomi_giocatori[winner_index]}\n")
+
     testo_vincite.config(state="disabled")
 
+    # Se qualcuno ha fatto tombola, fine del gioco
+    if primi_vincitori["tombola"] is not None:
+        winner_index = primi_vincitori["tombola"]
+        label_estrazione.config(text=f"{nomi_giocatori[winner_index]} ha fatto TOMBOLA! Il gioco termina.")
+        btn_estrai.config(state="disabled")
+
 def aggiorna_probabilita():
-    # Calcola per ciascun giocatore la probabilità di estrarre un numero utile al prossimo giro.
-    # Numeri utili = quelli della cartella non ancora estratti.
-    # Probability = (count numeri non estratti della cartella) / (count numeri rimanenti nel sacco)
     rimanenti = 90 - len(numeri_estratti)
     if rimanenti == 0:
         for et_prob in etichette_probabilita:
@@ -236,9 +263,6 @@ def aggiorna_probabilita():
         cart = giocatori_cartelle[g]
         tutti_numeri = [n for riga in cart for n in riga]
         estratti_nella_cartella = [n for n in tutti_numeri if n in numeri_estratti]
-        mancanti = len(tutti_numeri) - len(estratti_nella_cartella)
-        # Mancanti = numeri utili non ancora estratti
-        # Tra i numeri non estratti nel sacco, quanti sono nella cartella di questo giocatore?
         numeri_non_estratti = set(tutti_numeri) - set(numeri_estratti)
         numeri_rimanenti = set(range(1,91)) - set(numeri_estratti)
         utili = len(numeri_non_estratti.intersection(numeri_rimanenti))
@@ -247,23 +271,55 @@ def aggiorna_probabilita():
             prob = utili / rimanenti
         etichette_probabilita[g].config(text=f"Probabilità di estrarre un numero utile: {prob*100:.2f}%")
 
+def fine_gioco_se_necessario():
+    # Se non ci sono più numeri disponibili e nessuno ha fatto tombola, finisce il gioco
+    if not numeri_disponibili:
+        if primi_vincitori["tombola"] is None:
+            label_estrazione.config(text="Non ci sono più numeri, nessuna tombola! Il gioco termina.")
+        btn_estrai.config(state="disabled")
+
 def estrai_numero():
     if not numeri_disponibili:
         label_estrazione.config(text="Tutti i numeri sono stati estratti!")
+        fine_gioco_se_necessario()
         return
+
+    # Se qualcuno ha già fatto tombola, non estrarre più
+    if primi_vincitori["tombola"] is not None:
+        return
+
     numero = random.choice(numeri_disponibili)
     numeri_disponibili.remove(numero)
     numeri_estratti.append(numero)
 
     entita = numero_to_nome[numero]
     label_estrazione.config(text=f"Numero estratto: {numero} - {entita}")
-    print(entita)
 
     etichette_numeri[numero].config(bg="green", fg="white")
 
     aggiorna_cartelle()
+
+    # Avvia lampeggio dei numeri appena estratti nelle cartelle
+    for g in range(n_giocatori):
+        cart = giocatori_cartelle[g]
+        for r in range(3):
+            for c in range(5):
+                if cart[r][c] == numero:
+                    # Il label attuale è giallo, facciamolo lampeggiare
+                    # Alterniamo tra giallo e bianco per 2 volte (tot 1 secondo)
+                    lampeggia(etichette_cartelle[g][r][c], "yellow", "white", 2)
+
     aggiorna_vincite()
+
+    # Se dopo aver aggiornato le vincite qualcuno ha tombola, termina il gioco
+    if primi_vincitori["tombola"] is not None:
+        winner_index = primi_vincitori["tombola"]
+        print(f"{nomi_giocatori[winner_index]} ha vinto!")
+        # Gioco finito
+        return
+
     aggiorna_probabilita()
+    fine_gioco_se_necessario()
 
 btn_estrai = tk.Button(root, text="Estrazione", command=estrai_numero, font=font_grande)
 btn_estrai.pack(pady=20)
