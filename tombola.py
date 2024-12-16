@@ -96,19 +96,15 @@ numero_to_nome = {
     90: "’A Paura"
 }
 
-
 # Leggi il numero di giocatori
-# Se si utilizza sys.argv:
-# if len(sys.argv) < 2:
-#     print("Specificare il numero di giocatori")
-#     sys.exit(1)
-# n_giocatori = int(sys.argv[1])
-
-# Oppure chiedi input da utente:
 n_giocatori = int(input("Inserisci il numero di giocatori: "))
 
-# Genera cartelle random per i giocatori
-# Ogni cartella: 3 righe x 5 colonne = 15 numeri unici da 1 a 90
+# Leggi il nome dei giocatori
+nomi_giocatori = []
+for i in range(n_giocatori):
+    nome = input(f"Inserisci il nome del giocatore {i+1}: ")
+    nomi_giocatori.append(nome)
+
 def genera_cartella():
     numeri = random.sample(range(1,91), 15)
     cartella = [numeri[i*5:(i+1)*5] for i in range(3)]
@@ -121,11 +117,7 @@ numeri_estratti = []
 numeri_disponibili = list(range(1,91))
 
 # Controllo vincite
-# ambo, terno, quaterna, cinquina (linea intera), tombola
-# ambo = 2 in una riga, terno=3 in una riga, quaterna=4 in una riga, cinquina=5 in una riga, tombola=15 su tutta la cartella
 def controlla_cartella(cartella, estratti):
-    # restituisce un dizionario con True/False per ambo,terno,quaterna,cinquina e tombola
-    # Verifica ogni riga, conta quanti estratti ci sono
     risultati = {
         "ambo": False,
         "terno": False,
@@ -149,57 +141,61 @@ def controlla_cartella(cartella, estratti):
         risultati["tombola"] = True
     return risultati
 
-# Tracciamento di chi ha fatto cosa per evitare di ripetere
 giocatori_vincite = [ {"ambo":False,"terno":False,"quaterna":False,"cinquina":False,"tombola":False} for _ in range(n_giocatori) ]
 
-# Creazione interfaccia grafica
 root = tk.Tk()
 root.title("Tombola - Finestra Principale")
+root.geometry("1000x800")
 
-# Label estrazione
-label_estrazione = tk.Label(root, text="Premi 'Estrazione' per estrarre un numero", font=("Arial", 14))
-label_estrazione.pack()
+# Font grande
+font_grande = ("Arial", 18)
 
-# Frame per i numeri da 1 a 90
+label_estrazione = tk.Label(root, text="Premi 'Estrazione' per estrarre un numero", font=font_grande)
+label_estrazione.pack(pady=10)
+
 frame_numeri = tk.Frame(root)
-frame_numeri.pack()
+frame_numeri.pack(pady=10)
 
 etichette_numeri = {}
 for i in range(1,91):
-    lbl = tk.Label(frame_numeri, text=str(i), width=3, borderwidth=1, relief="solid", font=("Arial", 10))
-    lbl.grid(row=(i-1)//10, column=(i-1)%10)
+    lbl = tk.Label(frame_numeri, text=str(i), width=3, borderwidth=1, relief="solid", font=font_grande)
+    lbl.grid(row=(i-1)//10, column=(i-1)%10, padx=5, pady=5)
     etichette_numeri[i] = lbl
 
-# Area per visualizzare le vincite
 frame_vincite = tk.Frame(root)
-frame_vincite.pack()
+frame_vincite.pack(pady=10)
 
-label_vincite = tk.Label(frame_vincite, text="Vincite:", font=("Arial", 12))
+label_vincite = tk.Label(frame_vincite, text="Vincite:", font=font_grande)
 label_vincite.pack(anchor="w")
 
-testo_vincite = tk.Text(frame_vincite, width=50, height=10, state="disabled")
+testo_vincite = tk.Text(frame_vincite, width=50, height=10, state="disabled", font=font_grande)
 testo_vincite.pack()
 
-# Finestra per ogni giocatore
+# Finestre giocatori
 finestre_giocatori = []
-etichette_cartelle = [] # etichette_cartelle[giocatore][riga][colonna] = Label
+etichette_cartelle = []
+etichette_probabilita = []
+
 for g in range(n_giocatori):
     fg = tk.Toplevel(root)
-    fg.title(f"Giocatore {g+1}")
+    fg.title(f"{nomi_giocatori[g]}")
+    fg.geometry("600x400")
     cart = giocatori_cartelle[g]
     lbls = []
     for r in range(3):
         row_lbls = []
         for c in range(5):
             num = cart[r][c]
-            l = tk.Label(fg, text=str(num), width=4, borderwidth=1, relief="solid", font=("Arial", 12))
-            l.grid(row=r, column=c, padx=5, pady=5)
+            l = tk.Label(fg, text=str(num), width=4, borderwidth=1, relief="solid", font=("Arial", 24))
+            l.grid(row=r, column=c, padx=10, pady=10)
             row_lbls.append(l)
         lbls.append(row_lbls)
+    et_prob = tk.Label(fg, text="Probabilità di estrarre un numero utile: N/A", font=("Arial", 14))
+    et_prob.grid(row=4, column=0, columnspan=5, pady=10)
+    etichette_probabilita.append(et_prob)
     finestre_giocatori.append(fg)
     etichette_cartelle.append(lbls)
 
-# Funzione per aggiornare cartelle
 def aggiorna_cartelle():
     for g in range(n_giocatori):
         cart = giocatori_cartelle[g]
@@ -212,25 +208,45 @@ def aggiorna_cartelle():
                 else:
                     lbl.config(bg="white")
 
-# Funzione per controllare e aggiornare vincite
 def aggiorna_vincite():
+    testo_vincite.config(state="normal")
+    testo_vincite.delete("1.0", tk.END)
     for g in range(n_giocatori):
         res = controlla_cartella(giocatori_cartelle[g], numeri_estratti)
         for chiave in res:
             if res[chiave] and not giocatori_vincite[g][chiave]:
                 giocatori_vincite[g][chiave] = True
-    # Mostra chi ha fatto cosa
-    testo_vincite.config(state="normal")
-    testo_vincite.delete("1.0", tk.END)
-    # Riporta i giocatori che hanno fatto ambo,terno,quaterna,cinquina,tombola
     for chiave in ["ambo","terno","quaterna","cinquina","tombola"]:
-        # verifica quali giocatori hanno quella vincita
-        vincitori = [f"Giocatore {i+1}" for i,v in enumerate(giocatori_vincite) if v[chiave]]
+        vincitori = [f"{nomi_giocatori[i]}" for i,v in enumerate(giocatori_vincite) if v[chiave]]
         if vincitori:
             testo_vincite.insert(tk.END, f"{chiave.capitalize()}: {', '.join(vincitori)}\n")
     testo_vincite.config(state="disabled")
 
-# Funzione estrazione numero
+def aggiorna_probabilita():
+    # Calcola per ciascun giocatore la probabilità di estrarre un numero utile al prossimo giro.
+    # Numeri utili = quelli della cartella non ancora estratti.
+    # Probability = (count numeri non estratti della cartella) / (count numeri rimanenti nel sacco)
+    rimanenti = 90 - len(numeri_estratti)
+    if rimanenti == 0:
+        for et_prob in etichette_probabilita:
+            et_prob.config(text="Probabilità di estrarre un numero utile: 0%")
+        return
+
+    for g in range(n_giocatori):
+        cart = giocatori_cartelle[g]
+        tutti_numeri = [n for riga in cart for n in riga]
+        estratti_nella_cartella = [n for n in tutti_numeri if n in numeri_estratti]
+        mancanti = len(tutti_numeri) - len(estratti_nella_cartella)
+        # Mancanti = numeri utili non ancora estratti
+        # Tra i numeri non estratti nel sacco, quanti sono nella cartella di questo giocatore?
+        numeri_non_estratti = set(tutti_numeri) - set(numeri_estratti)
+        numeri_rimanenti = set(range(1,91)) - set(numeri_estratti)
+        utili = len(numeri_non_estratti.intersection(numeri_rimanenti))
+        prob = 0.0
+        if rimanenti > 0:
+            prob = utili / rimanenti
+        etichette_probabilita[g].config(text=f"Probabilità di estrarre un numero utile: {prob*100:.2f}%")
+
 def estrai_numero():
     if not numeri_disponibili:
         label_estrazione.config(text="Tutti i numeri sono stati estratti!")
@@ -239,23 +255,19 @@ def estrai_numero():
     numeri_disponibili.remove(numero)
     numeri_estratti.append(numero)
 
-    # Aggiorna label estrazione con il numero e l'entità
     entita = numero_to_nome[numero]
     label_estrazione.config(text=f"Numero estratto: {numero} - {entita}")
     print(entita)
 
-    # Evidenzia il numero nella finestra principale
     etichette_numeri[numero].config(bg="green", fg="white")
 
-    # Aggiorna cartelle
     aggiorna_cartelle()
-
-    # Aggiorna vincite
     aggiorna_vincite()
+    aggiorna_probabilita()
 
+btn_estrai = tk.Button(root, text="Estrazione", command=estrai_numero, font=font_grande)
+btn_estrai.pack(pady=20)
 
-# Bottone estrazione
-btn_estrai = tk.Button(root, text="Estrazione", command=estrai_numero, font=("Arial", 12))
-btn_estrai.pack(pady=10)
+aggiorna_probabilita()
 
 root.mainloop()
